@@ -9,6 +9,7 @@ from sklearn.model_selection import KFold
 from .database import Database
 from .reduction import Reduction
 from .approximation import Approximation
+from scipy.optimize import minimize
 
 from abc import ABC, abstractmethod
 
@@ -32,7 +33,7 @@ class ReducedOrderModelInterface(ABC):
         """
         for plugin in self.plugins:
             if hasattr(plugin, when):
-                getattr(plugin, when)(self) 
+                getattr(plugin, when)(self)
 
 
 class ReducedOrderModel(ReducedOrderModelInterface):
@@ -82,7 +83,7 @@ class ReducedOrderModel(ReducedOrderModelInterface):
 
         self.plugins = plugins
 
-        self.clean()        
+        self.clean()
 
     def clean(self):
         self.train_full_database = None
@@ -93,11 +94,11 @@ class ReducedOrderModel(ReducedOrderModelInterface):
         self.test_reduced_database = None
         self.validation_full_database = None
         self.validation_reduced_database = None
-    
+
     @property
     def database(self):
         return self._database
-    
+
     @database.setter
     def database(self, value):
 
@@ -114,7 +115,7 @@ class ReducedOrderModel(ReducedOrderModelInterface):
     @property
     def reduction(self):
         return self._reduction
-    
+
     @reduction.setter
     def reduction(self, value):
         if not isinstance(value, Reduction):
@@ -130,13 +131,13 @@ class ReducedOrderModel(ReducedOrderModelInterface):
     @property
     def approximation(self):
         return self._approximation
-    
+
     @approximation.setter
     def approximation(self, value):
         if not isinstance(value, Approximation):
             raise TypeError(
                 "The approximation has to be an instance of the Approximation class, or a dict of Approximation.")
-        
+
         self._approximation = value
 
     @approximation.deleter
@@ -181,9 +182,6 @@ class ReducedOrderModel(ReducedOrderModelInterface):
         self.approximation.fit(self.train_reduced_database.parameters_matrix,
                            self.train_reduced_database.snapshots_matrix)
 
-        # ddd
-
-
         # if self.n_database == 1 and self.n_reduction == 1:
         #     self.train_full_database = self.database
         #     self.reduction.fit(self.database.snapshots_matrix.T)
@@ -202,7 +200,7 @@ class ReducedOrderModel(ReducedOrderModelInterface):
         #     print(self.reduction)
         #     for reduction, database in zip(self.reduction, self.train_full_database):
         #         self.reduction[reduction].fit(self.train_full_database[database].snapshots_matrix.T)
-                 
+
         # elif self.n_database > 1 and self.n_reduction > 1:
         #     raise NotImplementedError
         # else:
@@ -229,7 +227,7 @@ class ReducedOrderModel(ReducedOrderModelInterface):
         self._execute_plugins('fit_before_approximation')
 
         self.fit_approximation()
-                
+
         self._execute_plugins('fit_after_approximation')
 
         return self
@@ -266,9 +264,9 @@ class ReducedOrderModel(ReducedOrderModelInterface):
         # print(self.predict_reduced_database._pairs[0])
         # print(self.predict_reduced_database._pairs[0][1].values)
 
-        print(self.predict_reduced_database.parameters_matrix)
-        print(self.approximation.predict(
-                self.predict_reduced_database.parameters_matrix))
+        #print(self.predict_reduced_database.parameters_matrix)
+        #print(self.approximation.predict(
+        #        self.predict_reduced_database.parameters_matrix))
         self.predict_reduced_database = Database(
             self.predict_reduced_database.parameters_matrix,
             self.approximation.predict(
@@ -539,7 +537,7 @@ class MultiReducedOrderModel(ReducedOrderModelInterface):
                 self.approximation.keys()
             )
             self.roms = {
-                
+
                 tuple(key): ReducedOrderModel(
                     copy.deepcopy(self.database[key[0]]),
                     copy.deepcopy(self.reduction[key[1]]),
@@ -562,7 +560,7 @@ class MultiReducedOrderModel(ReducedOrderModelInterface):
     @property
     def database(self):
         return self._database
-    
+
     @database.setter
     def database(self, value):
 
@@ -572,7 +570,7 @@ class MultiReducedOrderModel(ReducedOrderModelInterface):
 
         if isinstance(value, Database):
             self._database = {0: value}
-        else: 
+        else:
             self._database = value
 
     @database.deleter
@@ -582,7 +580,7 @@ class MultiReducedOrderModel(ReducedOrderModelInterface):
     @property
     def reduction(self):
         return self._reduction
-    
+
     @reduction.setter
     def reduction(self, value):
         if not isinstance(value, (Reduction, dict)):
@@ -591,7 +589,7 @@ class MultiReducedOrderModel(ReducedOrderModelInterface):
 
         if isinstance(value, Reduction):
             self._reduction = {0: value}
-        else: 
+        else:
             self._reduction = value
 
     @reduction.deleter
@@ -601,13 +599,13 @@ class MultiReducedOrderModel(ReducedOrderModelInterface):
     @property
     def approximation(self):
         return self._approximation
-    
+
     @approximation.setter
     def approximation(self, value):
         if not isinstance(value, (Approximation, dict)):
             raise TypeError(
                 "The approximation has to be an instance of the Approximation class, or a dict of Approximation.")
-        
+
         if isinstance(value, Approximation):
             self._approximation = {0: value}
         else:
@@ -628,9 +626,6 @@ class MultiReducedOrderModel(ReducedOrderModelInterface):
         value_, class_ = self.approximation, Approximation
         return len(value_) if isinstance(value_, class_) else 1
 
-        # ddd
-
-
         # if self.n_database == 1 and self.n_reduction == 1:
         #     self.train_full_database = self.database
         #     self.reduction.fit(self.database.snapshots_matrix.T)
@@ -649,7 +644,7 @@ class MultiReducedOrderModel(ReducedOrderModelInterface):
         #     print(self.reduction)
         #     for reduction, database in zip(self.reduction, self.train_full_database):
         #         self.reduction[reduction].fit(self.train_full_database[database].snapshots_matrix.T)
-                 
+
         # elif self.n_database > 1 and self.n_reduction > 1:
         #     raise NotImplementedError
         # else:
@@ -666,9 +661,6 @@ class MultiReducedOrderModel(ReducedOrderModelInterface):
             rom_.fit()
 
         self._execute_plugins('fit_postprocessing')
-        # print(self.database)
-        # print(self.reduction)
-        # print(self.approximation)
 
         # from itertools import product
         # element_keys = product(
@@ -677,7 +669,7 @@ class MultiReducedOrderModel(ReducedOrderModelInterface):
         #     self.approximation.keys()
         # )
         # self.roms = {
-            
+
         #     tuple(key): {
         #         'database': copy.deepcopy(self.database[key[0]]),
         #         'reduction': copy.deepcopy(self.reduction[key[1]]),
@@ -712,6 +704,73 @@ class MultiReducedOrderModel(ReducedOrderModelInterface):
 
         return self
 
+    def optimize_sigma(self, db_val, model, sigma_range=[1e-3, 1]):
+        '''
+        Optimize the parameter sigma in the validation set.
+        '''
+        def obj_func(sigma):
+            self.fit_weights(db_val, model, sigma=sigma)
+            return self.test_error(db_val)
+        res = minimize(obj_func, x0=sigma_range[0],
+                method="L-BFGS-B", bounds=[sigma_range])
+        print('Optimal sigma value in weights: ', res.x)
+        return res.x
+
+    def _check_weights(self, weights):
+        # replace nan values with small numbers
+        # check where nan values are
+        nan_values = np.isnan(weights)
+        if nan_values.any():
+            weights[nan_values] = 1/len(self.roms)
+
+    def _predict_weights(self, param_test):
+        '''
+        Predict the weights in the test set (after fitting the model in the
+        validation set).
+        '''
+        # predict the gaussians in the test set
+        self.gaussians_test_database = {}
+        for k, gauss_ in self.gaussians_val_database.items():
+            self.gaussians_test_database[k] = self.aggregation_models[k].predict(
+                    param_test)
+        sum_gaussians = np.sum(np.array(list(self.gaussians_test_database.values())),
+                axis=0)
+        # compute the weights in the test set (normalized gaussians)
+        self.weights_test_database = {}
+        for k in list(self.roms.keys()):
+            self.weights_test_database[k] = (self.gaussians_test_database[k]
+                    /sum_gaussians)
+            self._check_weights(self.weights_test_database[k])
+        return self.weights_test_database
+
+
+    def fit_weights(self, db_val, model, sigma=None, sigma_range=[1e-3, 1]):
+        '''
+        Fit the aggregation model.
+        '''
+        if not isinstance(db_val, Database):
+            raise TypeError
+
+        # compute the weights in the validation set
+        self.multi_val_database = {}
+        self.weights_val_database = {}
+        self.gaussians_val_database = {}
+        self.aggregation_models = {}
+
+        for k, rom_ in self.roms.items():
+            self.aggregation_models[k] = copy.deepcopy(model)
+            self.multi_val_database[k] = rom_.predict(db_val) #rom prediction
+            # gaussian computation (weights numerator)
+            g_ = (db_val.snapshots_matrix -
+                    self.multi_val_database[k].snapshots_matrix)**2
+            self.gaussians_val_database[k] = np.exp(- g_/(2*sigma**2))
+            # fit regression in validation set
+            self.aggregation_models[k].fit(db_val.parameters_matrix,
+                    self.gaussians_val_database[k])
+
+        return self
+
+
     def predict(self, parameters):
         """
         Calculate predicted solution for given mu
@@ -724,17 +783,35 @@ class MultiReducedOrderModel(ReducedOrderModelInterface):
         self._execute_plugins('predict_preprocessing')
 
         self.multi_predict_database = {}
+
+        # convert parameters from Database to numpy array (if database)
+        if isinstance(parameters, Database):
+            parameters_array = parameters.parameters_matrix
+        elif isinstance(parameters, (list, np.ndarray, tuple)):
+            parameters_array = np.atleast_2d(parameters)
+        else:
+            raise TypeError
+
         for k, rom_ in self.roms.items():
-            print(rom_.predict_full_database)
-            print(rom_.predict_full_database.snapshots_matrix)
-            print(rom_.predict_full_database.parameters_matrix)
-            self.multi_predict_database[k] = rom_.predict(rom_.predict_full_database)
-            print(self.multi_predict_database)
-            
+            self.multi_predict_database[k] = rom_.predict(parameters_array)
+
+        # compute weights
+        self.weights_test_database = self._predict_weights(parameters_array)
+
+        # compute the prediction
+        prediction = np.sum([self.weights_test_database[k] *
+            self.multi_predict_database[k] for k in
+            list(self.roms.keys())], axis=0)
+
 
         self._execute_plugins('predict_postprocessing')
-            
-        return self.multi_predict_database
+        if isinstance(parameters, Database):
+            return Database(
+                    parameters.parameters_matrix, prediction)
+        else:
+            return prediction
+
+
 
     def save(self, fname, save_db=True, save_reduction=True, save_approx=True):
         """
@@ -798,7 +875,7 @@ class MultiReducedOrderModel(ReducedOrderModelInterface):
             test snapshots.
         :rtype: numpy.ndarray
         """
-        predicted_test = self.predict(test.parameters_matrix)
+        predicted_test = self.predict(test)
         return np.mean(
             norm(predicted_test.snapshots_matrix - test.snapshots_matrix,
             axis=1) / norm(test.snapshots_matrix, axis=1))

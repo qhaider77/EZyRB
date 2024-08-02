@@ -10,7 +10,7 @@ from .meta import *
 from .database import Database
 from .snapshot import Snapshot
 from .parameter import Parameter
-from .reducedordermodel import ReducedOrderModel
+from .reducedordermodel import ReducedOrderModel, MultiReducedOrderModel
 from .reduction import *
 from .approximation import *
 from .regular_grid import RegularGrid
