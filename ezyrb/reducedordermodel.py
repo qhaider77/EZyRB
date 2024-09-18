@@ -212,7 +212,6 @@ class ReducedOrderModel(ReducedOrderModelInterface):
 
         """
         self._execute_plugins('fit_preprocessing')
-
         if self.train_full_database is None:
            self.train_full_database = copy.deepcopy(self.database)
 
@@ -545,9 +544,16 @@ class MultiReducedOrderModel(ReducedOrderModelInterface):
                 )
                 for key in element_keys
             }
+        elif (len(args) == 2 and isinstance(args[0], Database)
+            and isinstance(args[1], dict)):
+            self.database = args[0]
+            self.roms = args[1]
 
         elif len(args) == 1 and isinstance(args[0], dict):
             self.roms = args[0]
+            roms_keys = list(self.roms.keys())
+            self.database = {roms_keys[i]: self.roms[roms_keys[i]].database
+                        for i in range(len(self.roms))}
 
         if plugins is None:
             plugins = []
@@ -556,6 +562,7 @@ class MultiReducedOrderModel(ReducedOrderModelInterface):
         if rom_plugin is not None:
             for rom_ in self.roms.values():
                 rom_.plugins.append(rom_plugin)
+
 
     @property
     def database(self):
@@ -658,120 +665,98 @@ class MultiReducedOrderModel(ReducedOrderModelInterface):
         self._execute_plugins('fit_preprocessing')
 
         for rom_ in self.roms.values():
-            rom_.fit()
+            if rom_.train_reduced_database==None:
+                rom_.fit()
 
         self._execute_plugins('fit_postprocessing')
 
-        # from itertools import product
-        # element_keys = product(
-        #     self.database.keys(),
-        #     self.reduction.keys(),
-        #     self.approximation.keys()
-        # )
-        # self.roms = {
 
-        #     tuple(key): {
-        #         'database': copy.deepcopy(self.database[key[0]]),
-        #         'reduction': copy.deepcopy(self.reduction[key[1]]),
-        #         'approximation': copy.deepcopy(self.approximation[key[2]])
-        #     }
-        #     for key in element_keys
-        # }
-        # print(self.roms)
-        # self._full_database = copy.deepcopy(self.database)
-
-        # # FULL-ORDER PREPROCESSING here
-        # for plugin in self.plugins:
-        #     plugin.fom_preprocessing(self)
-
-        # self.fit_reduction()
-        # # self.reduction.fit(self._full_database.snapshots_matrix.T)
-        # # print(self.reduction.singular_values)
-        # # print(self._full_database.snapshots_matrix)
-        # reduced_snapshots = self.reduction.transform(
-        #     self._full_database.snapshots_matrix.T).T
-
-        # self._reduced_database = Database(
-        #     self._full_database.parameters_matrix, reduced_snapshots)
-
-        # # REDUCED-ORDER PREPROCESSING here
-        # for plugin in self.plugins:
-        #     plugin.rom_preprocessing(self)
-
-        # self.approximation.fit(
-        #     self._reduced_database.parameters_matrix,
-        #     self._reduced_database.snapshots_matrix)
 
         return self
 
-    def optimize_sigma(self, db_val, model, sigma_range=[1e-3, 1]):
-        '''
-        Optimize the parameter sigma in the validation set.
-        '''
-        def obj_func(sigma):
-            self.fit_weights(db_val, model, sigma=sigma)
-            return self.test_error(db_val)
-        res = minimize(obj_func, x0=sigma_range[0],
-                method="L-BFGS-B", bounds=[sigma_range])
-        print('Optimal sigma value in weights: ', res.x)
-        return res.x
+    #def optimize_sigma(self, db_val, model, sigma_range=[1e-3, 1]):
+    #    '''
+    #    Optimize the parameter sigma in the validation set.
+    #    '''
+    #    def obj_func(sigma):
+    #        self.fit_weights(db_val, model, sigma=sigma)
+    #        return self.test_error(db_val)
+    #    res = minimize(obj_func, x0=sigma_range[0],
+    #            method="L-BFGS-B", bounds=[sigma_range])
+    #    print('Optimal sigma value in weights: ', res.x)
+    #    return res.x
 
-    def _check_weights(self, weights):
-        # replace nan values with small numbers
-        # check where nan values are
-        nan_values = np.isnan(weights)
-        if nan_values.any():
-            weights[nan_values] = 1/len(self.roms)
+    #def _check_sum_gaussians(self, sum_gaussians, gaussians):
+    #    # replace zero values with small numbers
+    #    zero_values = sum_gaussians < 1e-4
+    #    sum_gaussians_new = copy.deepcopy(sum_gaussians)
+    #    if zero_values.any():
+    #        sum_gaussians_new[zero_values] = 1
+    #        gaussians[zero_values] = 1/len(self.roms)
+    #    return sum_gaussians_new, gaussians
 
-    def _predict_weights(self, param_test):
-        '''
-        Predict the weights in the test set (after fitting the model in the
-        validation set).
-        '''
-        # predict the gaussians in the test set
-        self.gaussians_test_database = {}
-        for k, gauss_ in self.gaussians_val_database.items():
-            self.gaussians_test_database[k] = self.aggregation_models[k].predict(
-                    param_test)
-        sum_gaussians = np.sum(np.array(list(self.gaussians_test_database.values())),
-                axis=0)
-        # compute the weights in the test set (normalized gaussians)
-        self.weights_test_database = {}
-        for k in list(self.roms.keys()):
-            self.weights_test_database[k] = (self.gaussians_test_database[k]
-                    /sum_gaussians)
-            self._check_weights(self.weights_test_database[k])
-        return self.weights_test_database
-
-
-    def fit_weights(self, db_val, model, sigma=None, sigma_range=[1e-3, 1]):
-        '''
-        Fit the aggregation model.
-        '''
-        if not isinstance(db_val, Database):
-            raise TypeError
-
-        # compute the weights in the validation set
-        self.multi_val_database = {}
-        self.weights_val_database = {}
-        self.gaussians_val_database = {}
-        self.aggregation_models = {}
-
-        for k, rom_ in self.roms.items():
-            self.aggregation_models[k] = copy.deepcopy(model)
-            self.multi_val_database[k] = rom_.predict(db_val) #rom prediction
-            # gaussian computation (weights numerator)
-            g_ = (db_val.snapshots_matrix -
-                    self.multi_val_database[k].snapshots_matrix)**2
-            self.gaussians_val_database[k] = np.exp(- g_/(2*sigma**2))
-            # fit regression in validation set
-            self.aggregation_models[k].fit(db_val.parameters_matrix,
-                    self.gaussians_val_database[k])
-
-        return self
+    #def _predict_weights(self, param_test):
+    #    '''
+    #    Predict the weights in the test set (after fitting the model in the
+    #    validation set).
+    #    '''
+    #    # predict the gaussians in the test set
+    #    self.gaussians_test_database = {}
+    #    for k, gauss_ in self.gaussians_val_database.items():
+    #        self.gaussians_test_database[k] = self.aggregation_models[k].predict(
+    #                param_test)
+    #    sum_gaussians = np.sum(np.array(list(self.gaussians_test_database.values())),
+    #            axis=0)
+    #    for k, gauss_ in self.gaussians_val_database.items():
+    #        self.gaussians_test_database[k] = self.aggregation_models[k].predict(
+    #                param_test)
+    #        _, self.gaussians_test_database[k] = self._check_sum_gaussians(
+    #                sum_gaussians, self.gaussians_test_database[k])
+    #    # compute the weights in the test set (normalized gaussians)
+    #    self.weights_test_database = {}
+    #    for k in list(self.roms.keys()):
+    #        self.weights_test_database[k] = (self.gaussians_test_database[k]
+    #                /_)
+    #    return self.weights_test_database
 
 
-    def predict(self, parameters):
+    #def fit_weights(self, db_val, model, sigma=None, sigma_range=[1e-3, 1]):
+    #    '''
+    #    Fit the aggregation model.
+    #    '''
+    #    if not isinstance(db_val, Database):
+    #        raise TypeError
+    #    # compute the weights in the validation set
+    #    self.multi_val_database = {}
+    #    self.weights_val_database = {}
+    #    self.gaussians_val_database = {}
+    #    self.aggregation_models = {}
+
+    #    for k, rom_ in self.roms.items():
+    #        if not isinstance(model, dict):
+    #            self.aggregation_models[k] = copy.deepcopy(model)
+    #        else:
+    #            self.aggregation_models[k] = model[k]
+    #        self.multi_val_database[k] = rom_.predict(db_val) #rom prediction
+    #        # gaussian computation (weights numerator)
+    #        g_ = (db_val.snapshots_matrix -
+    #                self.multi_val_database[k].snapshots_matrix)**2
+    #        self.gaussians_val_database[k] = np.exp(- g_/(2*sigma**2))
+    #        # fit regression in validation set
+    #        self.aggregation_models[k].fit(db_val.parameters_matrix,
+    #                self.gaussians_val_database[k])
+
+    #    # check sum gaussians
+    #    sum_gaussians = np.sum(np.array(list(self.gaussians_val_database.values())),
+    #            axis=0)
+    #    for k, gauss_ in self.gaussians_val_database.items():
+    #        _, self.gaussians_val_database[k] = self._check_sum_gaussians(
+    #                sum_gaussians, self.gaussians_val_database[k])
+    #        self.gaussians_val_database[k] = self.gaussians_val_database[k]/_
+    #    return self
+
+
+    def predict(self, parameters=None):
         """
         Calculate predicted solution for given mu
 
@@ -782,34 +767,34 @@ class MultiReducedOrderModel(ReducedOrderModelInterface):
 
         self._execute_plugins('predict_preprocessing')
 
-        self.multi_predict_database = {}
-
         # convert parameters from Database to numpy array (if database)
         if isinstance(parameters, Database):
-            parameters_array = parameters.parameters_matrix
+            self.predict_full_database = parameters
         elif isinstance(parameters, (list, np.ndarray, tuple)):
-            parameters_array = np.atleast_2d(parameters)
+            self.predict_full_database = Database(parameters, [None]*len(parameters))
+        elif parameters is None:
+            if self.predict_full_database is None:
+                raise RuntimeError
         else:
             raise TypeError
 
+        self.multi_predict_database = {}
         for k, rom_ in self.roms.items():
-            self.multi_predict_database[k] = rom_.predict(parameters_array)
+            self.multi_predict_database[k] = rom_.predict(self.predict_full_database)
 
-        # compute weights
-        self.weights_test_database = self._predict_weights(parameters_array)
+        ## compute weights
+        #self.weights_test_database = self._predict_weights(parameters_array)
 
-        # compute the prediction
-        prediction = np.sum([self.weights_test_database[k] *
-            self.multi_predict_database[k] for k in
-            list(self.roms.keys())], axis=0)
-
+        ## compute the prediction
+        #prediction = np.sum([self.weights_test_database[k] *
+        #    self.multi_predict_database[k] for k in
+        #    list(self.roms.keys())], axis=0)
 
         self._execute_plugins('predict_postprocessing')
         if isinstance(parameters, Database):
-            return Database(
-                    parameters.parameters_matrix, prediction)
+            return self.predict_reduced_database
         else:
-            return prediction
+            return self.predict_reduced_database.snapshots_matrix
 
 
 
@@ -875,9 +860,9 @@ class MultiReducedOrderModel(ReducedOrderModelInterface):
             test snapshots.
         :rtype: numpy.ndarray
         """
-        predicted_test = self.predict(test)
+        predicted_test = self.predict(test.parameters_matrix)
         return np.mean(
-            norm(predicted_test.snapshots_matrix - test.snapshots_matrix,
+            norm(predicted_test - test.snapshots_matrix,
             axis=1) / norm(test.snapshots_matrix, axis=1))
 
     def kfold_cv_error(self, n_splits, *args, norm=np.linalg.norm, **kwargs):

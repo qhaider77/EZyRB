@@ -17,7 +17,7 @@ class Database():
         None meaning no scaling.
     :param array_like space: the input spatial data
     """
-    def __init__(self, parameters=None, snapshots=None):
+    def __init__(self, parameters=None, snapshots=None, space=None):
         self._pairs = []
 
         if parameters is None and snapshots is None:
@@ -33,7 +33,7 @@ class Database():
         
         for param, snap in zip(parameters, snapshots):
             param = Parameter(param)
-            snap = Snapshot(snap)
+            snap = Snapshot(snap, space=space)
 
             self.add(param, snap)
 

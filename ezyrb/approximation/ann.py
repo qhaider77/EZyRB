@@ -128,7 +128,10 @@ class ANN(Approximation):
         layers.insert(0, points.shape[1])
         layers.append(values.shape[1])
 
-        self.model = self._list_to_sequential(layers, self.function)
+        if self.model is None:
+            self.model = self._list_to_sequential(layers, self.function)
+        else:
+            self.model = self.model
 
     def fit(self, points, values):
         """
