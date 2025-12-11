@@ -26,7 +26,7 @@ class DatabaseScaler(Plugin):
         self.scaler = scaler
         self.mode = mode
         self.target = target
-
+        
     @property
     def target(self):
         """
@@ -141,5 +141,5 @@ class DatabaseScaler(Plugin):
                 db.parameters_matrix,
                 self.scaler.inverse_transform(self._select_matrix(db)),
             )
-
+            
         rom._reduced_database = new_db

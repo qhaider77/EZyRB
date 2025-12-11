@@ -99,7 +99,12 @@ class ReducedOrderModel():
         :rtype: Database
         """
         mu = np.atleast_2d(mu)
-
+        
+        for plugin in self.plugins:
+            if plugin.target == 'parameters':
+                mu = plugin.scaler.transform(mu)
+            
+ 
         self._reduced_database = Database(
                 mu, np.atleast_2d(self.approximation.predict(mu)))
 
@@ -312,3 +317,107 @@ class ReducedOrderModel():
         distance = np.transpose([vertices[0] - vi for vi in vertices[1:]])
         return np.abs(
             np.linalg.det(distance) / math.factorial(vertices.shape[1]))
+
+    def reconstruction_error(self, db=None, relative=True, eps=1e-12):
+        """
+        Calculate the reconstruction error between the original snapshots and
+        the ones reconstructed by the ROM.
+        
+        :param database.Database db: the database to use to compute the error.
+            If None, the error is computed on the training database.
+            Default is None.
+        :param bool relative: True if the error computed is relative. Default is 
+            True.
+        :param float eps: small number to avoid division by zero in relative
+            error computation. Default is 1e-12.
+        :return: the vector containing the reconstruction errors.
+        
+        Esempio:    
+        >>> from ezyrb import ReducedOrderModel as ROM
+        >>> from ezyrb import POD, RBF, Database
+        >>> db = Database(param, snapshots) # param and snapshots are assumed 
+        to be declared
+        >>> db_train = db[:10] # training database
+        >>> db_test = db[10:] # test database
+        >>> pod = POD()
+        >>> rbf = RBF()
+        >>> rom = ROM(db_train, pod, rbf)
+        >>> rom.fit()
+        >>> err_train_reduct = rom.reconstruction_error(relative=True)
+        >>> err_test_reduct = rom.reconstruction_error(db_test, relative=True)
+        """
+        
+        errs = []
+        if db is None:
+            db = self.database   
+        snap = db.snapshots_matrix
+        snap_red = self.reduction.transform(snap.T)
+        snap_full = self.reduction.inverse_transform(snap_red).T
+
+        E = snap - snap_full
+
+        if relative:
+            num = np.linalg.norm(E, axis=1)
+            den = np.linalg.norm(snap, axis=1) + eps
+            
+            err = float(np.mean(num/den))        
+        else:
+            err = float(np.mean(np.linalg.norm(E, axis=1)))
+        errs.append(err)
+        
+        return np.array(errs)
+
+    def approximation_error(self, db=None, relative=True, eps=1e-12):
+        """
+        Calculate the approximation error between the true modal coefficients
+        and the approximated ones.
+        
+        :param database.Database db: the database to use to compute the error.
+            If None, the error is computed on the training database.
+            Default is None.
+        :param bool relative: True if the error computed is relative. Default is 
+            True.
+        :param float eps: small number to avoid division by zero in relative
+            error computation. Default is 1e-12.
+            
+        :return: the vector containing the approximation errors.
+        
+        Esempio:
+        >>> from ezyrb import ReducedOrderModel as ROM
+        >>> from ezyrb import POD, RBF, Database
+        >>> db = Database(param, snapshots) # param and snapshots are assumed 
+        to be declared
+        >>> db_train = db[:10] # training database
+        >>> db_test = db[10:] # test database
+        >>> pod = POD()
+        >>> rbf = RBF()
+        >>> rom = ROM(db_train, pod, rbf)
+        >>> rom.fit()
+        >>> err_train_approx = rom.approximation_error(relative=True)
+        >>> err_test_approx = rom.approximation_error(db_test, relative=True)
+
+        """
+        errs = []
+        if db is None:
+            db = self.database
+
+        snap = db.snapshots_matrix
+        params_true = self.reduction.transform(snap.T).T
+
+        params = db.parameters_matrix
+
+        params_approx = self.approximation.predict(params)
+
+        E = params_true - params_approx
+
+        if relative:
+            num = np.linalg.norm(E, axis=1)
+            den = np.linalg.norm(params_true, axis=1) + eps
+
+            err = float(np.mean(num/den))
+        else:
+            err = float(np.mean(np.linalg.norm(E, axis=1)))
+        errs.append(err)
+
+        return np.array(errs)
+
