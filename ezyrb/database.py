@@ -17,17 +17,33 @@ class Database():
         None meaning no scaling.
     :param array_like space: the input spatial data
     """
-    def __init__(self, parameters=None, snapshots=None):
+    def __init__(self, parameters=None, snapshots=None, space=None):
         self._pairs = []
 
         if parameters is None and snapshots is None:
             return
 
+        if parameters is None:
+            parameters = [None] * len(snapshots)
+        elif snapshots is None:
+            snapshots = [None] * len(parameters)
+
         if len(parameters) != len(snapshots):
-            raise ValueError
+            raise ValueError('parameters and snapshots must have the same length')
 
         for param, snap in zip(parameters, snapshots):
-            self.add(Parameter(param), Snapshot(snap))
+            param = Parameter(param)
+            if isinstance(space, dict):
+                snap_space = space.get(tuple(param.values), None)
+                # print('snap_space', snap_space)
+            else:
+                snap_space = space
+            snap = Snapshot(snap, space=snap_space)
+
+            self.add(param, snap)
+
+        # TODO: eventually improve the `space` assignment in the snapshots,
+        # snapshots can have different space coordinates
 
     @property
     def parameters_matrix(self):
@@ -74,7 +90,9 @@ class Database():
 
     def __str__(self):
         """ Print minimal info about the Database """
-        return str(self.parameters_matrix)
+        s = 'Database with {} snapshots and {} parameters'.format(
+            self.snapshots_matrix.shape[1], self.parameters_matrix.shape[1])
+        return s
 
     def add(self, parameter, snapshot):
         """
@@ -103,6 +121,10 @@ class Database():
         >>> train, test = db.split([80, 20])   # n snapshots
 
         """
+
+        if seed is not None:
+            np.random.seed(seed)
+
         if all(isinstance(n, int) for n in chunks):
             if sum(chunks) != len(self):
                 raise ValueError('chunk elements are inconsistent')
@@ -117,6 +139,7 @@ class Database():
         elif all(isinstance(n, float) for n in chunks):
             if not np.isclose(sum(chunks), 1.):
                 raise ValueError('chunk elements are inconsistent')
+
 
             cum_chunks = np.cumsum(chunks)
             cum_chunks = np.insert(cum_chunks, 0, 0.0)
@@ -137,3 +160,15 @@ class Database():
                 new_database[i].add(p, s)
 
         return new_database
+    
+    def get_snapshot_space(self, index):
+        """
+        Get the space coordinates of a snapshot by its index.
+
+        :param int index: The index of the snapshot.
+        :return: The space coordinates of the snapshot.
+        :rtype: numpy.ndarray
+        """
+        if index < 0 or index >= len(self._pairs):
+            raise IndexError("Snapshot index out of range.")
+        return self._pairs[index][1].space

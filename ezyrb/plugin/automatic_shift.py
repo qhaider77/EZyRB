@@ -133,8 +133,8 @@ class AutomaticShiftSnapshots(Plugin):
 
             n_epoch += 1
 
-    def fom_preprocessing(self, rom):
-        db = rom._full_database
+    def fit_preprocessing(self, rom):
+        db = rom.database
 
         reference_snapshot = db._pairs[self.reference_index][1]
         self.reference_snapshot = reference_snapshot
@@ -155,12 +155,12 @@ class AutomaticShiftSnapshots(Plugin):
             snap.values = self.interpolator.predict(
                 reference_snapshot.space.reshape(-1, 1)).flatten()  # reconstructing shifted snapshots in physical space 
 
-    def fom_postprocessing(self, rom):
+    def predict_postprocessing(self, rom):
         
         ref_space = self.reference_snapshot.space
         db = Database()
 
-        for param, snap in rom._full_database._pairs:
+        for param, snap in rom.predict_full_database._pairs:
             input_shift = np.hstack([
                 ref_space.reshape(-1, 1),
                 np.ones(shape=(ref_space.shape[0], 1))*param.values])
