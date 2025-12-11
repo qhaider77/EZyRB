@@ -6,7 +6,7 @@ from ezyrb import KNeighborsRegressor, RadiusNeighborsRegressor, Linear
 from ezyrb import ReducedOrderModel as ROM
 from ezyrb.plugin.scaler import DatabaseScaler
 
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 snapshots = np.load('tests/test_datasets/p_snapshots.npy').T
 pred_sol_tst = np.load('tests/test_datasets/p_predsol.npy').T
@@ -18,22 +18,30 @@ def test_constructor():
     pod = POD()
     import torch
     rbf = RBF()
-    rbf = ANN([10, 10], function=torch.nn.Softplus(), stop_training=[1000])
+    #rbf = ANN([10, 10], function=torch.nn.Softplus(), stop_training=[1000])
     db = Database(param, snapshots.T)
     # rom = ROM(db, pod, rbf, plugins=[DatabaseScaler(StandardScaler(), 'full', 'snapshots')])
     rom = ROM(db, pod, rbf, plugins=[
-        DatabaseScaler(StandardScaler(), 'full', 'parameters'),
+        DatabaseScaler(StandardScaler(), 'reduced', 'parameters'),
         DatabaseScaler(StandardScaler(), 'reduced', 'snapshots')
     ])
     rom.fit()
-    print(rom.predict(rom.database.parameters_matrix))
-    print(rom.database.snapshots_matrix)
+   
+    
 
 
-# def test_values():
-#     snap = Snapshot(test_value)
-#     snap.values = test_value
-#     snap = Snapshot(test_value, space=test_space)
-#     with pytest.raises(ValueError):
-#         snap.values = test_value[:-2]
+def test_values():
+    pod = POD()
+    rbf = RBF()
+    db = Database(param, snapshots.T)
+    rom = ROM(db, pod, rbf, plugins=[
+        DatabaseScaler(StandardScaler(), 'reduced', 'snapshots'),
+        DatabaseScaler(StandardScaler(), 'full', 'parameters')
+    ])
+    rom.fit()
+    test_param = param[2]
+    truth_sol = db.snapshots_matrix[2]
+    predicted_sol = rom.predict(test_param).snapshots_matrix[0]
+    np.testing.assert_allclose(predicted_sol, truth_sol, 
+            rtol=1e-5, atol=1e-5)
 

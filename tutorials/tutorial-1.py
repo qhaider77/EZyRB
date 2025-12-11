@@ -33,11 +33,11 @@
 import numpy as np
 import matplotlib.tri as mtri
 import matplotlib.pyplot as plt
-
+from datasets import load_dataset
 from ezyrb import POD, RBF, Database
 from ezyrb import ReducedOrderModel as ROM
-from smithers.dataset import TermalDataset as ThermalDataset
-get_ipython().run_line_magic('matplotlib', 'inline')
+
+# get_ipython().run_line_magic('matplotlib', 'inline')
 
 
 # ## Offline phase
@@ -46,19 +46,30 @@ get_ipython().run_line_magic('matplotlib', 'inline')
 
 # In[2]:
 
-data = ThermalDataset()
+data_path = "kshitij-pandey/termal_dataset"
+snapshots_hf = load_dataset(data_path, "snapshots", split="train")
+param_hf = load_dataset(data_path, "params", split="train")
+triangles_hf    = load_dataset(data_path, "triangles", split="train")
+coords_hf = load_dataset(data_path, "coords",     split="train")
 
-snapshots = data.snapshots
-param = data.params
-print(snapshots.shape, param.shape)
 
+# convert the dict files into numpy
 
+def hf_to_numpy(ds):
+    return np.stack([np.array(ds[col]) for col in ds.column_names], axis=1)
+
+snapshots = hf_to_numpy(snapshots_hf)
+param = hf_to_numpy(param_hf)
+triangles = hf_to_numpy(triangles_hf)
+coords = hf_to_numpy(coords_hf)
 # Moreover, to visualize the solution (both the higher-order one and the reduced one), we import also the mesh information to be able to create the triangulation. We underline this additional step is related only to plotting purpose, and not mandatory for the reduced space generation.
 
 # In[3]:
 
 
-triang = data.triang
+x, y  = coords
+from matplotlib.tri import Triangulation
+triang = Triangulation(x, y, triangles)
 
 # For the sake of clarity the snapshots are plotted.
 
@@ -71,7 +82,7 @@ for i in range(8):
     ax[i].triplot(triang, 'b-', lw=0.1)
     cm = ax[i].tripcolor(triang, snapshots[i])
     fig.colorbar(cm, ax=ax[i])
-    ax[i].set_title('($\mu_0={:5.2f}, \mu_1={:5.2f})$'.format(*param[i]))
+    ax[i].set_title(r'($\mu_0={:5.2f}, \mu_1={:5.2f})$'.format(*param[i]))
 
 
 # First of all, we create a `Database` object from the parameters and the snapshots.
@@ -164,6 +175,3 @@ for pt, error in zip(rom.database.parameters_matrix, rom.loo_error()):
 
 
 rom.optimal_mu()
-
-
-# These function can be used to achieve the wanted (estimated) accuracy.

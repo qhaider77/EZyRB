@@ -15,11 +15,22 @@
 # First of all, we just import the package and instantiate the dataset object.
 
 # In[1]:
+from datasets import load_dataset
+data_path = "kshitij-pandey/navier_stokes_datasets"
+snapshots_hf = load_dataset(data_path, "snapshots_split", split="train")
+param_hf = load_dataset(data_path, "params", split="train")
+triangles_hf    = load_dataset(data_path, "triangles", split="train")
+coords_hf = load_dataset(data_path, "coords",     split="train")
+import numpy as np
+snapshots = {name: np.array(snapshots_hf[name]) for name in ['vx', 'vy', 'mag(v)', 'p']}
+# convert the dict files into numpy
 
+def hf_to_numpy(ds):
+    return np.stack([np.array(ds[col]) for col in ds.column_names], axis=1)
 
-from smithers.dataset import NavierStokesDataset
-data = NavierStokesDataset()
-
+params = hf_to_numpy(param_hf)
+triangles = hf_to_numpy(triangles_hf)
+coords = hf_to_numpy(coords_hf)
 
 # The `NavierStokesDataset()` class contains the attribute:
 # - `snapshots`: the matrices of snapshots stored by row (one matrix for any output field)
@@ -28,7 +39,7 @@ data = NavierStokesDataset()
 # - `faces`: the actual topology of the discretize space
 # - `triang`: the triangulation, useful especially for rendering purposes.
 # 
-# In the details, `data.snapshots` is a dictionary with the following output of interest:
+# In the details, `snapshots` is a dictionary with the following output of interest:
 # - **vx:** velocity in the X-direction. 
 # - **vy:** velocity in the Y-direction. 
 # - **mag(v):** velocity magnitude.
@@ -40,9 +51,9 @@ data = NavierStokesDataset()
 
 
 for name in ['vx', 'vy', 'p', 'mag(v)']:
-    print('Shape of {:7s} snapshots matrix: {}'.format(name, data.snapshots[name].shape))
+    print('Shape of {:7s} snapshots matrix: {}'.format(name, snapshots[name].shape))
     
-print('Shape of parameters matrix: {}'.format(data.params.shape))
+print('Shape of parameters matrix: {}'.format(params.shape))
 
 
 # ### Initial setting
@@ -76,7 +87,7 @@ from ezyrb import RBF, GPR, KNeighborsRegressor, RadiusNeighborsRegressor, Linea
 # Model order reduction calss
 from ezyrb import ReducedOrderModel as ROM
 
-import numpy as np
+
 import torch
 import torch.nn as nn
 
@@ -85,19 +96,21 @@ import matplotlib.pyplot as plt
 
 import warnings
 warnings.filterwarnings("ignore", message="Ill-conditioned matrix ")
-get_ipython().run_line_magic('matplotlib', 'inline')
+# get_ipython().run_line_magic('matplotlib', 'inline')
 
 
 # Before starting with the reduced order model, we visualize some of the snapshots in our dataset.
 
 # In[4]:
-
+x, y  = coords
+from matplotlib.tri import Triangulation
+triang = Triangulation(x, y, triangles)
 
 fig, ax = plt.subplots(nrows=3, ncols=3, figsize=(16, 8), sharey=True, sharex=True)
 ax = ax.flatten()
 for i in range(9):
-    ax[i].tricontourf(data.triang, data.snapshots['vx'][i], levels=16)
-    ax[i].set_title('Original snapshot at inlet velocity = {}'.format(*data.params[i].round(2)))
+    ax[i].tricontourf(triang, snapshots['vx'][i], levels=16)
+    ax[i].set_title('Original snapshot at inlet velocity = {}'.format(*params[i].round(2)))
 
 
 # In this step, we perform the model order reduction to obtain a reduced space from the full order space. We refer to [Tutorial 1](https://github.com/mathLab/EZyRB/blob/master/tutorials/tutorial-1.ipynb) for the description of the basic workflow, here we just quickly describe the steps implemented in the next cell.
@@ -107,7 +120,7 @@ for i in range(9):
 # In[5]:
 
 
-db = Database(data.params, data.snapshots['vx'])
+db = Database(params, snapshots['vx'])
 rom = ROM(db, POD(), RBF())
 rom.fit();
 
@@ -123,7 +136,7 @@ new_params = np.random.uniform(size=(2))*79.+1.
 
 fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(16, 3))
 for i, param in enumerate(new_params):
-    ax[i].tricontourf(data.triang, *rom.predict([param]).snapshots_matrix)
+    ax[i].tricontourf(triang, *rom.predict([param]).snapshots_matrix)
     ax[i].set_title('Predicted snapshots at inlet velocity = {}'.format(param))
 
 
@@ -226,4 +239,3 @@ for redname, redclass in reductions.items():
 
 reductions['AE'] = AE([100, 10], [10, 100], nn.ReLU(), nn.ReLU(), 30000)
 approximations['ANN'] = ANN([50, 10], nn.ReLU(), 30000)
-
