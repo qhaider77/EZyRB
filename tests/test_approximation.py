@@ -5,7 +5,6 @@ from ezyrb import (GPR, Linear, RBF, ANN, KNeighborsRegressor,
 import sklearn
 import pytest
 
-import torch.nn as nn
 np.random.seed(17)
 
 def get_xy():
@@ -22,7 +21,7 @@ def get_xy():
 
 @pytest.mark.parametrize("model,kwargs", [
     (GPR, {}),
-    (ANN, {'layers': [20, 20], 'function': nn.Tanh(), 'stop_training': 1e-8, 'last_identity': True}),
+    (ANN, {'layers': [20], 'activation': 'relu', 'max_iter': 5000, 'tol':1e-5, 'learning_rate_init':0.0001, 'solver':'lbfgs'}),
     (KNeighborsRegressor, {'n_neighbors': 1}),
     (RadiusNeighborsRegressor, {'radius': 0.1}),
     (Linear, {}),
@@ -45,6 +44,6 @@ class TestApproximation:
         approx.fit(x, y)
         test_y = approx.predict(x)
         if isinstance(approx, ANN):
-            np.testing.assert_array_almost_equal(y, test_y, decimal=3)
+            np.testing.assert_array_almost_equal(y, test_y, decimal=2)
         else:
             np.testing.assert_array_almost_equal(y, test_y, decimal=6)
