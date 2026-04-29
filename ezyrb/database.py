@@ -15,10 +15,6 @@ class Database:
 
     :param array_like parameters: the input parameters
     :param array_like snapshots: the input snapshots
-    :param Scale scaler_parameters: the scaler for the parameters. Default
-        is None meaning no scaling.
-    :param Scale scaler_snapshots: the scaler for the snapshots. Default is
-        None meaning no scaling.
     :param array_like space: the input spatial data
 
     :Example:
@@ -45,6 +41,7 @@ class Database:
             type(space),
         )
         self._pairs = []
+
 
         if parameters is None and snapshots is None:
             logger.debug("Empty database created")
@@ -149,11 +146,11 @@ class Database:
         """
         if not isinstance(parameter, Parameter):
             logger.error("Invalid parameter type: %s", type(parameter))
-            raise ValueError
+            raise TypeError(f"Expected a Parameter object, got {type(parameter)}")
 
         if not isinstance(snapshot, Snapshot):
             logger.error("Invalid snapshot type: %s", type(snapshot))
-            raise ValueError
+            raise TypeError(f"Expected a Snapshot object, got {type(snapshot)}")
 
         self._pairs.append((parameter, snapshot))
         logger.debug(
@@ -161,7 +158,7 @@ class Database:
         )
 
         return self
-
+    
     def split(self, chunks, seed=None):
         """
 
@@ -209,7 +206,7 @@ class Database:
 
         else:
             logger.error("Invalid chunk type")
-            ValueError
+            raise TypeError(f"Invalid chunk type. Expected a list of integers or floats, but got {type(chunks)}.")
 
         new_database = [Database() for _ in range(len(chunks))]
         for i, chunk in enumerate(chunks):
