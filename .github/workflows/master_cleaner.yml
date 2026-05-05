@@ -14,8 +14,8 @@ jobs:
       
       - uses: psf/black@stable
         with:
-          src: "./ezyrb"
           options: "--check"
+          src: "./ezyrb"
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v3
