@@ -13,9 +13,6 @@
     <a href="https://badge.fury.io/py/ezyrb">
         <img src="https://badge.fury.io/py/ezyrb.svg" alt="PyPI version" height="18">
     </a>
-    <a href="https://www.codacy.com/gh/mathLab/EZyRB/dashboard?utm_source=github.com&utm_medium=referral&utm_content=mathLab/EZyRB&utm_campaign=Badge_Coverage" target="_blank">
-        <img alt="Coverage Status" src="https://app.codacy.com/project/badge/Coverage/0e6973fc18694fa38e3bc1802c0acc48">
-    </a>
     <a class="badge-align" href="https://www.codacy.com/gh/mathLab/EZyRB/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=mathLab/EZyRB&amp;utm_campaign=Badge_Grade">
         <img src="https://app.codacy.com/project/badge/Grade/0e6973fc18694fa38e3bc1802c0acc48"/>
     </a>
